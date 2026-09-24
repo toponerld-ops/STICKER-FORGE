@@ -5,3 +5,4 @@
 ### What is it? & How to use Sticker Forge?
 well its a basic website where you can adjust the size of the preset stickers background color and upload your own stickers to make a printable A4 sticker page. There are sliders for the stickers to adjust the size tilt it, and a few other features. But thats basically how you use it!.
 ----
+[Journal.md](./Journal.md).
