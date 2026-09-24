@@ -82,7 +82,10 @@ select{width:100%;border:2px solid var(--ink);border-radius:9px;padding:8px;back
 .status{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:12px;font-weight:700}
 .tag{background:var(--green);padding:5px 9px;border:2px solid var(--ink);border-radius:9px;transform:rotate(1deg)}
 .right .big-stat{font-size:40px;line-height:1;margin:5px 0}
-.sheet{margin-top:18px;background:white;border:2px solid var(--ink);padding:10px;box-shadow:4px 5px 0 #aaa;aspect-ratio:210/297;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.sheet{margin-top:18px;background:white;border:2px solid var(--ink);padding:10px;box-shadow:4px 5px 0 #aaa;aspect-ratio:210/297;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;transition:aspect-ratio .15s ease}
+.sheet.landscape{aspect-ratio:297/210}
+.sheet.letter{aspect-ratio:8.5/11}
+.sheet.letter.landscape{aspect-ratio:11/8.5}
 .sheet .mini{background:#f4f0e6;border:1px dashed #aaa;display:grid;place-items:center;font-size:9px;font-weight:700;overflow:hidden}
 .sticker-library{margin-top:20px;border-top:2px dashed #b8afa1;padding-top:14px}
 .library{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
@@ -121,7 +124,7 @@ html,body{scroll-behavior:auto}
   <div class="tape a"></div><div class="tape b"></div>
   <header class="topbar">
     <div class="brand">
-      <div class="brand-mark">✦</div>
+      <div class="brand-mark">SF</div>
       <div>
         <h1>StickerForge</h1>
         <p>make something worth sticking around for.</p>
@@ -135,7 +138,7 @@ html,body{scroll-behavior:auto}
 
   <section class="workspace">
     <aside class="panel left">
-      <h2>✦ Make a sticker</h2>
+      <h2>Make a sticker</h2>
       <div class="drop" id="drop">
         <div>
           <strong>DROP IT HERE</strong>
@@ -179,7 +182,7 @@ html,body{scroll-behavior:auto}
     </section>
 
     <aside class="panel right">
-      <h2>✦ Your sheet</h2>
+      <h2>Your sheet</h2>
       <div class="big-stat" id="count">0</div>
       <div style="font-weight:700">stickers on the desk</div>
       <label class="label">Paper</label>
@@ -190,7 +193,7 @@ html,body{scroll-behavior:auto}
       </select>
       <label class="label">Sheet spacing</label>
       <input type="range" id="spacing" min="2" max="24" value="9">
-      <button class="btn red" style="width:100%;margin-top:15px" id="optimize">✦ Optimize sheet</button>
+      <button class="btn red" style="width:100%;margin-top:15px" id="optimize">Optimize sheet</button>
       <div class="sheet" id="sheet"></div>
       <button class="btn" style="width:100%;margin-top:12px" id="sheetBtn">▣ Export sheet PNG</button>
       <p class="note">StickerForge is intentionally simple: make → arrange → ship.</p>
@@ -324,6 +327,7 @@ function addUploaded(src){
   const img=document.createElement('img');
   img.className='sticker-item';
   img.draggable=false;
+  img.dataset.objectUrl=src;
   img.dataset.outline=currentOutline;
   img.dataset.size=currentSize;
   img.dataset.rotation=currentRotation;
@@ -345,36 +349,209 @@ function addUploaded(src){
   img.onerror=()=>toastMsg('Could not read that image. Try PNG, JPG, or WEBP.');
   img.src=src;
 }
+function getPaperSpec(){
+  const value=document.getElementById('paper').value;
+  if(value==='A4 — landscape') return {name:'A4 landscape',width:3508,height:2480,orientation:'landscape'};
+  if(value==='Letter — portrait') return {name:'Letter portrait',width:2550,height:3300,orientation:'portrait',letter:true};
+  return {name:'A4 portrait',width:2480,height:3508,orientation:'portrait'};
+}
+
+function updateSheetOrientation(){
+  const spec=getPaperSpec();
+  sheetEl.classList.toggle('landscape',spec.orientation==='landscape');
+  sheetEl.classList.toggle('letter',!!spec.letter);
+}
+
 function updateSheet(){
   countEl.textContent=stickers.length;
   sheetEl.innerHTML='';
-  stickers.slice(0,12).forEach((s,i)=>{const d=document.createElement('div');d.className='mini';const im=document.createElement('img');im.src=s.src;im.style.maxWidth='100%';im.style.maxHeight='100%';d.appendChild(im);sheet.appendChild(d)});
-  if(!stickers.length) sheetEl.innerHTML='<div class="mini" style="grid-column:1/-1">empty sheet</div>';
+  updateSheetOrientation();
+
+  stickers.slice(0,12).forEach((s)=>{
+    const d=document.createElement('div');
+    d.className='mini';
+    const im=document.createElement('img');
+    im.src=s.src;
+    im.alt='Sticker preview';
+    im.style.maxWidth='100%';
+    im.style.maxHeight='100%';
+    im.style.objectFit='contain';
+    d.appendChild(im);
+    sheetEl.appendChild(d);
+  });
+
+  if(!stickers.length){
+    sheetEl.innerHTML='<div class="mini" style="grid-column:1/-1">empty sheet</div>';
+  }
 }
+
 function optimize(){
-  const n=stickers.length;if(!n){toastMsg('Add some stickers first!');return}
-  const cols=Math.ceil(Math.sqrt(n)),rows=Math.ceil(n/cols),gap=+spacingInput.value;
-  stickers.forEach((s,i)=>{s.style.left=(20+(i%cols)*(stage.clientWidth-50)/cols+gap)+'px';s.style.top=(65+Math.floor(i/cols)*(stage.clientHeight-85)/rows+gap)+'px';s.style.width=Math.min(190,(stage.clientWidth-80)/cols)+'px';s.dataset.rotation=(rand(-7,7)).toFixed(0);applyStyle(s)});
-  toastMsg('Sheet optimized ✦ less empty space');
+  const n=stickers.length;
+  if(!n){toastMsg('Add some stickers first!');return}
+
+  const spec=getPaperSpec();
+  const gap=+spacingInput.value;
+  const ratio=spec.width/spec.height;
+  const cols=Math.max(1,Math.ceil(Math.sqrt(n*ratio)));
+  const rows=Math.ceil(n/cols);
+  const stageW=stage.clientWidth;
+  const stageH=stage.clientHeight;
+  const cellW=(stageW-(cols+1)*gap)/cols;
+  const cellH=(stageH-(rows+1)*gap)/rows;
+
+  stickers.forEach((sticker,i)=>{
+    const col=i%cols;
+    const row=Math.floor(i/cols);
+    const width=Math.max(55,Math.min(cellW,190));
+    sticker.style.width=width+'px';
+    sticker.style.left=(gap+col*(stageW/cols))+'px';
+    sticker.style.top=(gap+row*(stageH/rows))+'px';
+    sticker.dataset.rotation=(rand(-7,7)).toFixed(0);
+    applyStyle(sticker);
+  });
+
+  updateSheetOrientation();
+  toastMsg('Sheet optimized — less empty space');
 }
+
 function canvasExport(withSheet=false){
-  const c=document.createElement('canvas'), w=1200,h=800;c.width=w;c.height=h;const ctx=c.getContext('2d');
-  ctx.fillStyle='#f8f4ea';ctx.fillRect(0,0,w,h);
-  ctx.fillStyle='#202127';ctx.font='bold 34px Phantom Sans';ctx.fillText(withSheet?'StickerForge — printable sheet':'StickerForge',35,55);
-  const base=stage.getBoundingClientRect(), els=stickers.slice(0,withSheet?12:stickers.length);
-  const jobs=els.map(el=>new Promise(resolve=>{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{const er=el.getBoundingClientRect();const x=(er.left-base.left)/base.width*w;const y=(er.top-base.top)/base.height*(h-70)+70;const sw=er.width/base.width*w,sh=er.height/base.height*(h-70);ctx.save();ctx.translate(x+sw/2,y+sh/2);ctx.rotate((+el.dataset.rotation||0)*Math.PI/180);ctx.drawImage(im,-sw/2,-sh/2,sw,sh);ctx.restore();resolve()};im.onerror=resolve;im.src=el.src}));
-  Promise.all(jobs).then(()=>{const a=document.createElement('a');a.download=withSheet?'stickerforge-sheet.png':'stickerforge.png';a.href=c.toDataURL('image/png');a.click();toastMsg('Exported!')});
+  const spec=withSheet ? getPaperSpec() : {name:'desk',width:1600,height:1000};
+  const c=document.createElement('canvas');
+  c.width=spec.width;
+  c.height=spec.height;
+  const ctx=c.getContext('2d');
+
+  ctx.fillStyle=withSheet ? '#ffffff' : '#f8f4ea';
+  ctx.fillRect(0,0,c.width,c.height);
+
+  const base=stage.getBoundingClientRect();
+  const els=stickers.slice(0,withSheet?12:stickers.length);
+
+  if(!els.length){
+    toastMsg('Add some stickers first!');
+    return;
+  }
+
+  // Printable sheet uses a clean paper layout. Desk export mirrors the stage.
+  const margin=withSheet ? Math.round(Math.min(c.width,c.height)*0.045) : 35;
+  const availableW=c.width-margin*2;
+  const availableH=c.height-margin*2-(withSheet?0:45);
+
+  let cols, rows;
+  if(withSheet){
+    const ratio=c.width/c.height;
+    cols=Math.max(1,Math.ceil(Math.sqrt(els.length*ratio)));
+    rows=Math.ceil(els.length/cols);
+  }else{
+    cols=1; rows=1;
+  }
+
+  const gap=withSheet ? Math.round((+spacingInput.value/100)*Math.min(c.width,c.height)) : 0;
+  const cellW=withSheet ? (availableW-gap*(cols-1))/cols : availableW;
+  const cellH=withSheet ? (availableH-gap*(rows-1))/rows : availableH;
+
+  const jobs=els.map((el,index)=>new Promise(resolve=>{
+    // Drawing the already-loaded DOM image keeps uploaded blob URLs valid
+    // and avoids losing the user's uploaded image during export.
+    const draw=()=>{
+      try{
+        ctx.save();
+
+        let x,y,sw,sh;
+        if(withSheet){
+          const col=index%cols;
+          const row=Math.floor(index/cols);
+          const cellX=margin+col*(cellW+gap);
+          const cellY=margin+row*(cellH+gap);
+
+          const naturalW=el.naturalWidth||el.width||1;
+          const naturalH=el.naturalHeight||el.height||1;
+          const scale=Math.min((cellW*0.88)/naturalW,(cellH*0.88)/naturalH);
+          sw=Math.max(1,naturalW*scale);
+          sh=Math.max(1,naturalH*scale);
+          x=cellX+(cellW-sw)/2;
+          y=cellY+(cellH-sh)/2;
+        }else{
+          const er=el.getBoundingClientRect();
+          x=(er.left-base.left)/base.width*c.width;
+          y=(er.top-base.top)/base.height*availableH+(withSheet?margin:45);
+          sw=er.width/base.width*c.width;
+          sh=er.height/base.height*availableH;
+        }
+
+        // Recreate the sticker's white/colored paper backing.
+        const pad=Math.max(0,(+el.dataset.outline||0)*0.55);
+        if(pad){
+          ctx.fillStyle=el.dataset.paper==='white'?'#ffffff':({
+            yellow:'#ffd95a',
+            blue:'#bfe4ff',
+            pink:'#ffc6d6',
+            green:'#c9efc8'
+          }[el.dataset.paper]||'#ffffff');
+          const r=Math.min(28,pad+8);
+          ctx.beginPath();
+          const px=x-pad, py=y-pad, pw=sw+pad*2, ph=sh+pad*2;
+          ctx.roundRect(px,py,pw,ph,r);
+          ctx.fill();
+        }
+
+        const rot=(+el.dataset.rotation||0)*Math.PI/180;
+        ctx.translate(x+sw/2,y+sh/2);
+        ctx.rotate(rot);
+
+        const shadow=+el.dataset.shadow||0;
+        ctx.shadowColor='rgba(0,0,0,.22)';
+        ctx.shadowBlur=Math.max(0,shadow);
+        ctx.shadowOffsetY=shadow;
+
+        ctx.drawImage(el,-sw/2,-sh/2,sw,sh);
+        ctx.restore();
+      }catch(err){
+        console.warn('Export draw failed:',err);
+        ctx.restore?.();
+      }
+      resolve();
+    };
+
+    if(el.complete && el.naturalWidth){
+      draw();
+    }else{
+      el.addEventListener('load',draw,{once:true});
+      el.addEventListener('error',()=>resolve(),{once:true});
+    }
+  }));
+
+  Promise.all(jobs).then(()=>{
+    c.toBlob(blob=>{
+      if(!blob){
+        toastMsg('Export failed. Try again.');
+        return;
+      }
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.download=withSheet
+        ? `stickerforge-${spec.name.toLowerCase().replaceAll(' ','-')}.png`
+        : 'stickerforge-desk.png';
+      a.href=url;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1500);
+      toastMsg(withSheet?'Sheet exported!':'Exported!');
+    },'image/png');
+  });
 }
+
 function handleImageFile(file){
   if(!file) return;
   if(!file.type || !file.type.startsWith('image/')){
     toastMsg('Please choose an image file.');
     return;
   }
+
   const src=URL.createObjectURL(file);
   addUploaded(src);
   fileInput.value='';
-  setTimeout(()=>URL.revokeObjectURL(src),1000);
 }
 
 fileInput.addEventListener('change',e=>handleImageFile(e.target.files[0]));
@@ -392,16 +569,41 @@ stage.addEventListener('pointerdown',e=>{
 });
 stage.addEventListener('pointermove',e=>{if(!drag)return;const x=e.clientX-drag.sr.left-drag.dx,y=e.clientY-drag.sr.top-drag.dy;drag.el.style.left=Math.max(0,Math.min(stage.clientWidth-drag.el.offsetWidth,x))+'px';drag.el.style.top=Math.max(0,Math.min(stage.clientHeight-drag.el.offsetHeight,y))+'px';coordsEl.textContent=Math.round(x)+' × '+Math.round(y)});
 stage.addEventListener('pointerup',()=>drag=null);
-stage.addEventListener('dblclick',e=>{const el=e.target.closest('.sticker-item');if(el){stickers=stickers.filter(x=>x!==el);el.remove();selected=null;updateSheet();if(!stickers.length)empty.style.display='grid';toastMsg('Sticker removed')}});
+stage.addEventListener('dblclick',e=>{
+  const el=e.target.closest('.sticker-item');
+  if(el){
+    stickers=stickers.filter(x=>x!==el);
+    if(el.dataset.objectUrl) URL.revokeObjectURL(el.dataset.objectUrl);
+    el.remove();
+    selected=null;
+    updateSheet();
+    if(!stickers.length)empty.style.display='grid';
+    toastMsg('Sticker removed');
+  }
+});
 
 outlineInput.addEventListener('input',()=>{if(!selected)return;selected.dataset.outline=outlineInput.value;outlineValEl.textContent=outlineInput.value+'px';applyStyle(selected)});
 sizeInput.addEventListener('input',()=>{if(!selected)return;selected.dataset.size=sizeInput.value;sizeValEl.textContent=sizeInput.value+'%';applyStyle(selected)});
 rotationInput.addEventListener('input',()=>{if(!selected)return;selected.dataset.rotation=rotationInput.value;rotationValEl.textContent=rotationInput.value+'°';applyStyle(selected)});
 shadowInput.addEventListener('input',()=>{if(!selected)return;selected.dataset.shadow=shadowInput.value;applyStyle(selected)});
 document.querySelectorAll('.swatch').forEach(s=>s.addEventListener('click',()=>{document.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active'));s.classList.add('active');paperColor=s.dataset.color;if(selected){selected.dataset.paper=paperColor;applyStyle(selected)}}));
-newBtnEl.onclick=()=>{stickers.forEach(x=>x.remove());stickers=[];selected=null;empty.style.display='grid';updateSheet();toastMsg('Fresh sheet!')};
+newBtnEl.onclick=()=>{
+  stickers.forEach(x=>{
+    if(x.dataset.objectUrl) URL.revokeObjectURL(x.dataset.objectUrl);
+    x.remove();
+  });
+  stickers=[];
+  selected=null;
+  empty.style.display='grid';
+  updateSheet();
+  toastMsg('Fresh sheet!');
+};
 exportBtnEl.onclick=()=>canvasExport(false);sheetBtnEl.onclick=()=>canvasExport(true);optimizeBtnEl.onclick=optimize;
 shuffleBtnEl.onclick=makeBorder;
+document.getElementById('paper').addEventListener('change',()=>{
+  updateSheetOrientation();
+  if(stickers.length) optimize();
+});
 
 makeBorder();makeLibrary();updateSheet();window.addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(makeBorder,250)});
 
