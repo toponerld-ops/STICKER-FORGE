@@ -8,7 +8,7 @@ well its a basic website where you can adjust the size of the preset stickers ba
 ----
 ### JOURNAL
 
-Hours 1-4: through the hours 1 to 4 i spent thinking on what i shd build for this ysws,since i love stickers i was not letting this go away and then i heard my friend talking about the forge ysws and BINGO! STICKER-FORGE, so i wanted to build sticker-forge a website which forges stickers in any paper format you like. so ive stared to code it, and i didnt want to code it from scratch so i pulled up the code of one of my old websites which i built as a personal website(never finished it) and since it matched the theme i just started with that code and making mods to it.
+### Hours 1-4: through the hours 1 to 4 i spent thinking on what i shd build for this ysws,since i love stickers i was not letting this go away and then i heard my friend talking about the forge ysws and BINGO! STICKER-FORGE, so i wanted to build sticker-forge a website which forges stickers in any paper format you like. so ive stared to code it, and i didnt want to code it from scratch so i pulled up the code of one of my old websites which i built as a personal website(never finished it) and since it matched the theme i just started with that code and making mods to it.
 
 Hours 5-6: made the basic UI and also alot of the features dont work the upload does not work the border stickers which im sourcing from hackclub stickers do not seem to work, and the upload features do not work, but some of the basic festures do work!.
 
